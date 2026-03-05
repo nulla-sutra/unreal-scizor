@@ -27,7 +27,7 @@ A powerful combo system plugin for Unreal Engine 5, built on StateTree architect
 
 Scizor requires the following Unreal Engine plugins to be enabled:
 
-- **Treecko** (Required)
+- **[unreal-treecko](https://github.com/nulla-sutra/unreal-treecko)** (Required)
 - **StateTree** (Required)
 - **GameplayStateTree** (Required)
 - **GameplayAbilities** (Required)

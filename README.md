@@ -50,7 +50,7 @@ Scizor requires the following Unreal Engine plugins to be enabled:
 1. **Add the ScizorComboComponent** to your character or actor:
    ```cpp
    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combo")
-   UScizorComboComponent* ComboComponent;
+   TObjectPtr<UScizorComboComponent> ComboComponent;
    ```
 
 2. **Configure the StateTree** for your combo system using the Scizor schema

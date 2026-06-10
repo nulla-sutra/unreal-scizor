@@ -4,6 +4,9 @@
 #include "ScizorComboComponent.h"
 
 #include "StateTree.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Scizor/Combo/Animation/AnimNotifyState_ScizorComboWindow.h"
 #include "Scizor/Combo/Schema/ScizorComboSchema.h"

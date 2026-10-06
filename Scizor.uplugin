@@ -3,7 +3,7 @@
   "Version": 1,
   "VersionName": "1.0",
   "FriendlyName": "Scizor",
-  "Description": "",
+  "Description": "Combo windows and input routing for stock StateTree components and GAS.",
   "Category": "Other",
   "CreatedBy": "tarnishablec",
   "CreatedByURL": "https://github.com/tarnishablec",
@@ -22,7 +22,7 @@
   ],
   "Plugins": [
     {
-      "Name": "Treecko",
+      "Name": "Gengar",
       "Enabled": true,
       "Optional": false
     },

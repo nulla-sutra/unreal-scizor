@@ -3,16 +3,21 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Components/ActorComponent.h"
+#include "Engine/EngineTypes.h"
 #include "NativeGameplayTags.h"
 #include "Scizor/Combo/ComboTypes.h"
-#include "Treecko/Component/TreeckoStateComponent.h"
+#include "StructUtils/InstancedStruct.h"
 #include "ScizorComboComponent.generated.h"
 
 #define SCIZOR_INPUT_TAG_LITERAL "Scizor.Combo.ComboInput"
-
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(Tag_StateTreeEvent_BachComboInput);
 
+class UAnimInstance;
 class UAnimNotify_PlayMontageNotifyWindow;
+class USkeletalMeshComponent;
+class UStateTreeComponent;
+struct FBranchingPointNotifyPayload;
 
 namespace Scizor
 {
@@ -21,47 +26,55 @@ namespace Scizor
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FScizorCrossComboWindowDelegate, bool, bWindowOpen);
 
+/** Combo data and input routing; execution belongs to a separate stock StateTree component. */
 UCLASS(ClassGroup=(Scizor), meta=(BlueprintSpawnableComponent))
-class SCIZOR_API UScizorComboComponent : public UTreeckoStateComponent
+class SCIZOR_API UScizorComboComponent : public UActorComponent
 {
     GENERATED_BODY()
 
 public:
-    // Sets default values for this component's properties
     UScizorComboComponent();
 
-protected:
-    // Called when the game starts
-    virtual void BeginPlay() override;
-    virtual bool SetContextRequirements(FStateTreeExecutionContext& Context, bool bLogErrors = false) override;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combo",
+        meta=(UseComponentPicker, AllowedClasses="/Script/GameplayStateTreeModule.StateTreeComponent"))
+    FComponentReference StateTreeComponentReference;
 
-    virtual TSubclassOf<UStateTreeSchema> GetSchema() const override;
-    ////
-public:
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Combo")
     TSubclassOf<UAnimNotify_PlayMontageNotifyWindow> ComboWindowClass;
 
-    UPROPERTY(BlueprintAssignable)
+    UPROPERTY(BlueprintAssignable, Category="Combo")
     FScizorCrossComboWindowDelegate OnCrossComboWindow;
 
-    UFUNCTION(BlueprintPure)
-    FScizorComboInfoSummary GetComboInfoSummary() const;
+    UFUNCTION(BlueprintPure, Category="Combo")
+    UStateTreeComponent* GetStateTreeComponent() const;
 
-    FScizorComboInfoSummary ComboInfoSummaryCache;
+    UFUNCTION(BlueprintPure, Category="Combo")
+    FScizorComboInfoSummary GetComboInfoSummary();
 
-    UFUNCTION(BlueprintCallable,
-        meta=(CPP_Default_Tag = "Scizor.Combo.ComboInput", CPP_Default_Payload, AutoCreateRefTerm="Payload"))
+    UFUNCTION(BlueprintCallable, Category="Combo")
+    void RefreshAnimationBindings();
+
+    UFUNCTION(BlueprintCallable, Category="Combo",
+        meta=(CPP_Default_Tag="Scizor.Combo.ComboInput", CPP_Default_Payload, AutoCreateRefTerm="Payload"))
     void SendComboInputEvent(const FGameplayTag Tag = Scizor::DefaultComboEventTag,
-                             const TInstancedStruct<FScizorComboInputEventPayload>& Payload = {});
+        const TInstancedStruct<FScizorComboInputEventPayload>& Payload = {});
 
-protected:
+    virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+private:
     UFUNCTION()
-    void HandleAvatarMontageNotify(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointPayload);
+    void HandleComboWindowBegin(FName NotifyName, const FBranchingPointNotifyPayload& Payload);
+    UFUNCTION()
+    void HandleComboWindowEnd(FName NotifyName, const FBranchingPointNotifyPayload& Payload);
     UFUNCTION()
     void HandleMeshAnimInitialized();
-    UFUNCTION()
-    void HandleActorContextUpdated(const FTreeckoStateTreeActorContext& OldContext);
 
-    mutable int32 LastSummaryFrameCount = 0;
-    mutable FScizorComboInfoSummary SummaryCache;
+    void UnbindAnimation();
+    bool IsComboWindow(const FBranchingPointNotifyPayload& Payload) const;
+
+    TWeakObjectPtr<USkeletalMeshComponent> BoundMesh;
+    TWeakObjectPtr<UAnimInstance> BoundAnimInstance;
+    uint64 LastSummaryFrameCount = MAX_uint64;
+    FScizorComboInfoSummary SummaryCache;
 };

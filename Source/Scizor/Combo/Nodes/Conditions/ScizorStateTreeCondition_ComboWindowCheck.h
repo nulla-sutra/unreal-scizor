@@ -14,7 +14,7 @@ struct FScizorStateTreeCondition_ComboWindowCheck_InstanceData
 {
     GENERATED_BODY()
 
-    UPROPERTY(EditAnywhere, Category="Context")
+    UPROPERTY(EditAnywhere, Category="Input")
     TObjectPtr<UScizorComboComponent> StateTreeComponent;
 
     UPROPERTY(EditAnywhere, meta=(Bitmask, BitmaskEnum="/Script/Scizor.EScizorComboWindowState"))

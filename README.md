@@ -1,84 +1,42 @@
 # Scizor
 
-![UPlugin](https://img.shields.io/badge/.uplugin-1.0-blue)
-![License](https://img.shields.io/badge/license-MPL--2.0-blue)
+Scizor provides combo-window queries and input routing for Unreal Engine StateTree and GAS. It uses a separate, official `UStateTreeComponent`; the combo component is a regular `UActorComponent`.
 
-A powerful combo system plugin for Unreal Engine 5, built on StateTree architecture and integrated with the Gameplay Ability System (GAS) and Enhanced Input.
+## Setup
 
-## Features
+1. Add `ScizorComboComponent` and a stock `StateTreeComponent` to the actor.
+2. Use the official **StateTree Component** schema for the tree.
+3. Add **Ability System (Gengar)** and **Combo Component (Scizor)** as global evaluators. Bind each evaluator's `Actor` input to the schema's `Actor` context.
+4. Bind Ability tasks' ASC inputs to the GAS evaluator's `AbilitySystemComponent` output. Bind combo conditions/property functions to the combo evaluator's `ComboComponent` output.
+5. Set the combo component's `StateTreeComponentReference` to the desired StateTree component. An actor with exactly one StateTree can use the automatic lookup.
+6. Initialize GAS ActorInfo before calling the official component's `StartLogic`. Send input through `SendComboInputEvent`.
 
-- **StateTree-Based Combo System**: Leverages Unreal Engine's StateTree for flexible and efficient combo management
-- **ScizorComboComponent**: Core component for managing combo states and logic
-- **Combo Window Management**: Sophisticated state management system with four distinct phases:
-  - NoCombo
-  - BeforeComboWindow
-  - InsideComboWindow
-  - AfterComboWindow
-- **Animation Montage Integration**: Seamless integration with Unreal's animation system for combo execution
-- **Enhanced Input Support**: Full integration with Unreal Engine's Enhanced Input system for responsive combo inputs
-- **StateTree Nodes**: Custom conditions and property functions for combo logic
-  - Combo window check conditions
-  - Combo input check conditions
-  - Property functions for combo state queries
-- **Custom Schema Support**: Extensible schema system for custom combo configurations
-- **GAS Integration**: Full compatibility with the Gameplay Ability System
+The GAS evaluator exposes `bReady`, ASC, AbilityOwner, Avatar, Pawn, MeshComponent, Controller, and PlayerController. Mesh and Controller are optional. It resolves ASC through GAS, including a Pawn's PlayerState, and refreshes on StateTree updates. It does not replicate another copy of GAS context.
+
+The evaluators provide data. Gameplay Abilities remain responsible for ability execution and their network policies. Sending a StateTree event queues a local event; it is not an RPC.
+
+## Combo windows
+
+`GetComboInfoSummary` reports NoCombo, BeforeComboWindow, InsideComboWindow, or AfterComboWindow, using the active montage section and `AnimNotifyState_ScizorComboWindow` timestamps. Animation delegates are rebound when the avatar mesh or AnimInstance changes and removed on EndPlay.
+
+`SendComboInputEvent` accepts an optional input payload and forwards it to the selected stock StateTree component. It does not start the tree automatically.
 
 ## Dependencies
 
-Scizor requires the following Unreal Engine plugins to be enabled:
+- Gengar
+- StateTree
+- GameplayStateTree
+- GameplayAbilities
+- EnhancedInput
 
-- **[unreal-treecko](https://github.com/nulla-sutra/unreal-treecko)** (Required)
-- **StateTree** (Required)
-- **GameplayStateTree** (Required)
-- **GameplayAbilities** (Required)
-- **EnhancedInput** (Required)
+## Migrating Treecko assets
 
-## Installation
+Use the official StateTree Component schema and rebind legacy ASC/Avatar/Mesh/Controller inputs to the GAS evaluator's outputs. Rebind combo inputs to the combo evaluator. Replace unbound Treecko delay tasks with delayed OnTick transitions.
 
-1. Clone or download this repository
-2. Copy the `Scizor` folder to your project's `Plugins` directory
-3. If the `Plugins` directory doesn't exist, create it in your project root
-4. Open your Unreal Engine project
-5. When prompted, allow the engine to rebuild the plugin
-6. Enable the plugin in Edit → Plugins → Search for "Scizor"
-7. Restart the editor
+Move each actor's old `StateTreeRef` and parameters to its new stock component. In combo-input abilities, route inherited StateTree/Brain calls through `ScizorComboComponent.GetStateTreeComponent()`. Keep combo-window queries on the combo component.
 
-## Usage
-
-### Basic Setup
-
-1. **Add the ScizorComboComponent** to your character or actor:
-   ```cpp
-   UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combo")
-   TObjectPtr<UScizorComboComponent> ComboComponent;
-   ```
-
-2. **Configure the StateTree** for your combo system using the Scizor schema
-
-3. **Send combo input events** when the player performs an action:
-   ```cpp
-   ComboComponent->SendComboInputEvent(ComboInputTag, Payload);
-   ```
-
-4. **Query combo state** to check the current combo window:
-   ```cpp
-   FScizorComboInfoSummary ComboInfo = ComboComponent->GetComboInfoSummary();
-   ```
-
-### Key Concepts
-
-- **Combo Windows**: The system tracks animation phases and combo timing through window states
-- **Event-Driven**: Combos are triggered through gameplay events sent to the StateTree
-- **Input Actions**: Enhanced Input actions are used to identify specific combo inputs
+Compile and save migrated assets before removing Treecko. The plugin no longer defines a custom StateTree component or schema.
 
 ## License
 
-This project is licensed under the Mozilla Public License Version 2.0 (MPL-2.0). See the [LICENSE](LICENSE) file for details.
-
-## Author
-
-Created by [tarnishablec](https://github.com/tarnishablec)
-
-## Contributing
-
-This plugin is currently in beta. Contributions, issues, and feature requests are welcome!
+[Mozilla Public License 2.0](LICENSE).

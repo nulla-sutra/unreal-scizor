@@ -1,217 +1,214 @@
 ﻿// Copyright 2019-Present tarnishablec. All Rights Reserved.
 
-
 #include "ScizorComboComponent.h"
 
-#include "StateTree.h"
+#include "AbilitySystemComponent.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "Components/SkeletalMeshComponent.h"
-#include "Kismet/KismetSystemLibrary.h"
+#include "Components/StateTreeComponent.h"
+#include "CoreGlobals.h"
+#include "Gengar/Helpers/GengarAbilityLibrary.h"
 #include "Scizor/Combo/Animation/AnimNotifyState_ScizorComboWindow.h"
-#include "Scizor/Combo/Schema/ScizorComboSchema.h"
 
 UE_DEFINE_GAMEPLAY_TAG(Tag_StateTreeEvent_BachComboInput, SCIZOR_INPUT_TAG_LITERAL);
-
 namespace Scizor
 {
     const FGameplayTag DefaultComboEventTag = Tag_StateTreeEvent_BachComboInput;
 }
 
-// Sets default values for this component's properties
 UScizorComboComponent::UScizorComboComponent()
 {
-    // Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
-    // off to improve performance if you don't need them.
-    PrimaryComponentTick.bCanEverTick = true;
-    SetIsReplicatedByDefault(true);
-
-    // ...
-
+    PrimaryComponentTick.bCanEverTick = false;
     ComboWindowClass = UAnimNotifyState_ScizorComboWindow::StaticClass();
 }
 
-
-bool UScizorComboComponent::SetContextRequirements(FStateTreeExecutionContext& Context, bool bLogErrors)
-{
-    return Super::SetContextRequirements(Context, bLogErrors);
-}
-
-TSubclassOf<UStateTreeSchema> UScizorComboComponent::GetSchema() const
-{
-    return UScizorComboSchema::StaticClass();
-}
-
-
-// Called when the game starts
 void UScizorComboComponent::BeginPlay()
 {
-    OnActorContextUpdated.AddUniqueDynamic(this, &ThisClass::HandleActorContextUpdated);
-    //
     Super::BeginPlay();
+    RefreshAnimationBindings();
 }
 
-FScizorComboInfoSummary UScizorComboComponent::GetComboInfoSummary() const
+void UScizorComboComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-    // Cache In Each Tick
-    const auto CurrentFrameCount = UKismetSystemLibrary::GetFrameCount();
-
-    if (LastSummaryFrameCount == CurrentFrameCount)
+    UnbindAnimation();
+    if (auto* Mesh = BoundMesh.Get())
     {
-        return SummaryCache;
+        Mesh->OnAnimInitialized.RemoveDynamic(this, &ThisClass::HandleMeshAnimInitialized);
+    }
+    BoundMesh.Reset();
+    Super::EndPlay(EndPlayReason);
+}
+
+UStateTreeComponent* UScizorComboComponent::GetStateTreeComponent() const
+{
+    if (!GetOwner())
+    {
+        return nullptr;
+    }
+    if (!StateTreeComponentReference.ComponentProperty.IsNone()
+        || !StateTreeComponentReference.PathToComponent.IsEmpty()
+        || StateTreeComponentReference.OtherActor.IsValid()
+        || StateTreeComponentReference.OverrideComponent.IsValid())
+    {
+        return Cast<UStateTreeComponent>(StateTreeComponentReference.GetComponent(GetOwner()));
     }
 
-    LastSummaryFrameCount = UKismetSystemLibrary::GetFrameCount();
+    // The implicit choice is safe only when the actor has exactly one StateTree.
+    TInlineComponentArray<UStateTreeComponent*> Components;
+    GetOwner()->GetComponents(Components);
+    return Components.Num() == 1 ? Components[0] : nullptr;
+}
 
-    const auto Owner = ActorContext.Owner;
-    const auto Avatar = ActorContext.Avatar;
-    const auto MeshComponent = ActorContext.MeshComponent;
-    const auto Asc = ActorContext.AbilitySystemComponent;
-
-    if (!Owner || !Avatar || !MeshComponent || !Asc)
+void UScizorComboComponent::RefreshAnimationBindings()
+{
+    const auto* Asc = UGengarAbilityLibrary::ResolveAbilitySystemComponent(GetOwner());
+    auto* Mesh = Asc && Asc->AbilityActorInfo.IsValid()
+        ? Asc->AbilityActorInfo->SkeletalMeshComponent.Get() : nullptr;
+    if (Mesh != BoundMesh.Get())
     {
-        SummaryCache = {};
-        return SummaryCache;
-    }
-
-    const auto AnimInstance = MeshComponent->GetAnimInstance();
-
-    if (!AnimInstance || !AnimInstance->IsAnyMontagePlaying())
-    {
-        SummaryCache = {};
-        return SummaryCache;
-    }
-
-    const auto MontageInstance = AnimInstance->GetActiveMontageInstance();
-
-    if (!MontageInstance)
-    {
-        SummaryCache = {};
-        return SummaryCache;
-    }
-
-    bool IsInComboWindow = false;
-
-    const auto TargetProperty = MontageInstance->StaticStruct()->FindPropertyByName("ActiveStateBranchingPoints");
-    TArray<FAnimNotifyEvent> ActiveStateBranchingPoints;
-    TargetProperty->GetValue_InContainer(MontageInstance, &ActiveStateBranchingPoints);
-
-    for (auto&& Event : ActiveStateBranchingPoints)
-    {
-        if (Event.NotifyStateClass && Event.NotifyStateClass.IsA(ComboWindowClass))
+        UnbindAnimation();
+        if (auto* PreviousMesh = BoundMesh.Get())
         {
-            IsInComboWindow = true;
-            break;
+            PreviousMesh->OnAnimInitialized.RemoveDynamic(this, &ThisClass::HandleMeshAnimInitialized);
         }
-    }
-
-    const auto MontageAsset = MontageInstance->Montage;
-    const auto CurrentSection = MontageInstance->GetCurrentSection();
-    const auto CurrentPosition = MontageInstance->GetPosition();
-
-    float CurrentSectionStartTime;
-    float CurrentSectionEndTime;
-    MontageInstance->Montage->GetSectionStartAndEndTime(MontageAsset->GetSectionIndex(CurrentSection),
-                                                        CurrentSectionStartTime, CurrentSectionEndTime);
-
-    FAnimNotifyContext Context;
-    MontageAsset->GetAnimNotifiesFromDeltaPositions(
-        CurrentSectionStartTime + 0.001f, // Prevent retrieving last section's end
-        CurrentSectionEndTime,
-        Context);
-
-    const auto ComboNSEvent = Context.ActiveNotifies.FindByPredicate(
-        [this](const FAnimNotifyEventReference& Event)
+        BoundMesh = Mesh;
+        if (Mesh)
         {
-            return Event.GetNotify()->NotifyStateClass.IsA(ComboWindowClass);
-        });
-
-    if (!ComboNSEvent)
-    {
-        SummaryCache = {};
-        return SummaryCache;
+            Mesh->OnAnimInitialized.AddUniqueDynamic(this, &ThisClass::HandleMeshAnimInitialized);
+        }
+        HandleMeshAnimInitialized();
     }
-
-    const auto StartTime = ComboNSEvent->GetNotify()->GetTriggerTime();
-    const auto Duration = ComboNSEvent->GetNotify()->Duration;
-    const auto EndTime = ComboNSEvent->GetNotify()->GetEndTriggerTime();
-    const auto RemainTime = EndTime - CurrentPosition;
-
-    FScizorComboInfoSummary Result{
-        .ComboWindowState = EScizorComboWindowState::NoCombo,
-        .MontageAsset = MontageAsset,
-        .CurrentSection = CurrentSection,
-        .CurrentPosition = CurrentPosition,
-        .CurrentComboWindowRemainTime = RemainTime,
-        .CurrentComboWindowDuration = Duration,
-    };
-
-    if (IsInComboWindow)
+    else if (Mesh && Mesh->GetAnimInstance() != BoundAnimInstance.Get())
     {
-        Result.ComboWindowState = EScizorComboWindowState::InsideComboWindow;
+        HandleMeshAnimInitialized();
     }
-
-    if (CurrentPosition < StartTime)
-    {
-        Result.ComboWindowState = EScizorComboWindowState::BeforeComboWindow;
-    }
-
-    if (CurrentPosition > EndTime)
-    {
-        Result.ComboWindowState = EScizorComboWindowState::AfterComboWindow;
-    }
-
-    SummaryCache = Result;
-    return SummaryCache;
 }
 
-void UScizorComboComponent::SendComboInputEvent(const FGameplayTag Tag,
-                                                const TInstancedStruct<FScizorComboInputEventPayload>& Payload)
+void UScizorComboComponent::UnbindAnimation()
 {
-    SendStateTreeEvent(FStateTreeEvent(Tag, FInstancedStruct::Make(Payload.Get()), *this->GetName()));
-}
-
-// ReSharper disable once CppMemberFunctionMayBeConst
-void UScizorComboComponent::HandleAvatarMontageNotify(FName NotifyName,
-                                                      const FBranchingPointNotifyPayload& BranchingPointPayload)
-{
-    const auto& NotifyState = BranchingPointPayload.NotifyEvent->NotifyStateClass;
-    if (!NotifyState.IsA(ComboWindowClass))
+    if (auto* Anim = BoundAnimInstance.Get())
     {
-        return;
+        Anim->OnPlayMontageNotifyBegin.RemoveDynamic(this, &ThisClass::HandleComboWindowBegin);
+        Anim->OnPlayMontageNotifyEnd.RemoveDynamic(this, &ThisClass::HandleComboWindowEnd);
     }
-
-    OnCrossComboWindow.Broadcast(GetComboInfoSummary().ComboWindowState == EScizorComboWindowState::InsideComboWindow);
+    BoundAnimInstance.Reset();
+    SummaryCache = {};
+    LastSummaryFrameCount = MAX_uint64;
 }
 
 void UScizorComboComponent::HandleMeshAnimInitialized()
 {
-    const auto AnimInstance = ActorContext.MeshComponent->GetAnimInstance();
-
-    if (!AnimInstance)
+    UnbindAnimation();
+    if (auto* Mesh = BoundMesh.Get())
     {
-        return;
+        BoundAnimInstance = Mesh->GetAnimInstance();
     }
-
-    AnimInstance->OnPlayMontageNotifyBegin.AddUniqueDynamic(this, &ThisClass::HandleAvatarMontageNotify);
-    AnimInstance->OnPlayMontageNotifyEnd.AddUniqueDynamic(this, &ThisClass::HandleAvatarMontageNotify);
+    if (auto* Anim = BoundAnimInstance.Get())
+    {
+        Anim->OnPlayMontageNotifyBegin.AddUniqueDynamic(this, &ThisClass::HandleComboWindowBegin);
+        Anim->OnPlayMontageNotifyEnd.AddUniqueDynamic(this, &ThisClass::HandleComboWindowEnd);
+    }
 }
 
-
-void UScizorComboComponent::HandleActorContextUpdated(const FTreeckoStateTreeActorContext& OldContext)
+FScizorComboInfoSummary UScizorComboComponent::GetComboInfoSummary()
 {
-    if (OldContext.MeshComponent)
+    RefreshAnimationBindings();
+    if (LastSummaryFrameCount == GFrameCounter)
     {
-        OldContext.MeshComponent->OnAnimInitialized.RemoveAll(this);
-        // if (const auto OldAnimInstance = OldContext.MeshComponent->GetAnimInstance())
-        // {
-        //     OldAnimInstance->OnPlayMontageNotifyBegin.RemoveAll(this);
-        //     OldAnimInstance->OnPlayMontageNotifyEnd.RemoveAll(this);
-        // }
+        return SummaryCache;
+    }
+    LastSummaryFrameCount = GFrameCounter;
+    SummaryCache = {};
+
+    auto* Anim = BoundAnimInstance.Get();
+    const auto* MontageInstance = Anim ? Anim->GetActiveMontageInstance() : nullptr;
+    if (!MontageInstance || !MontageInstance->Montage)
+    {
+        return SummaryCache;
     }
 
-    if (ActorContext.MeshComponent)
+    auto* Montage = MontageInstance->Montage.Get();
+    const auto Section = MontageInstance->GetCurrentSection();
+    const auto SectionIndex = Montage->GetSectionIndex(Section);
+    if (SectionIndex == INDEX_NONE)
     {
-        ActorContext.MeshComponent->OnAnimInitialized.AddUniqueDynamic(this, &ThisClass::HandleMeshAnimInitialized);
+        return SummaryCache;
+    }
+
+    float SectionStart = 0.f;
+    float SectionEnd = 0.f;
+    Montage->GetSectionStartAndEndTime(SectionIndex, SectionStart, SectionEnd);
+    FAnimNotifyContext NotifyContext;
+    Montage->GetAnimNotifiesFromDeltaPositions(SectionStart + 0.001f, SectionEnd, NotifyContext);
+    const auto* Window = NotifyContext.ActiveNotifies.FindByPredicate(
+        [this](const FAnimNotifyEventReference& Event)
+        {
+            const auto* Notify = Event.GetNotify();
+            return Notify && Notify->NotifyStateClass && Notify->NotifyStateClass.IsA(ComboWindowClass);
+        });
+    if (!Window)
+    {
+        return SummaryCache;
+    }
+
+    const auto* Notify = Window->GetNotify();
+    const auto Position = MontageInstance->GetPosition();
+    const auto Start = Notify->GetTriggerTime();
+    const auto End = Notify->GetEndTriggerTime();
+
+    // Query montage time directly; private ActiveStateBranchingPoints is not an API.
+    SummaryCache.ComboWindowState = Position < Start ? EScizorComboWindowState::BeforeComboWindow
+        : Position > End ? EScizorComboWindowState::AfterComboWindow
+        : EScizorComboWindowState::InsideComboWindow;
+    SummaryCache.MontageAsset = Montage;
+    SummaryCache.CurrentSection = Section;
+    SummaryCache.CurrentPosition = Position;
+    SummaryCache.CurrentComboWindowRemainTime = End - Position;
+    SummaryCache.CurrentComboWindowDuration = Notify->Duration;
+    return SummaryCache;
+}
+
+void UScizorComboComponent::SendComboInputEvent(const FGameplayTag Tag,
+    const TInstancedStruct<FScizorComboInputEventPayload>& Payload)
+{
+    RefreshAnimationBindings();
+    auto* Tree = GetStateTreeComponent();
+    if (!Tree)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Scizor: assign a StateTree component on %s."), *GetNameSafe(GetOwner()));
+        return;
+    }
+    if (Payload.IsValid())
+    {
+        Tree->SendStateTreeEvent(Tag, FConstStructView::Make(Payload.Get()), GetFName());
+    }
+    else
+    {
+        Tree->SendStateTreeEvent(Tag, FConstStructView(), GetFName());
+    }
+}
+
+bool UScizorComboComponent::IsComboWindow(const FBranchingPointNotifyPayload& Payload) const
+{
+    return Payload.NotifyEvent && Payload.NotifyEvent->NotifyStateClass
+        && Payload.NotifyEvent->NotifyStateClass.IsA(ComboWindowClass);
+}
+
+void UScizorComboComponent::HandleComboWindowBegin(FName NotifyName, const FBranchingPointNotifyPayload& Payload)
+{
+    if (IsComboWindow(Payload))
+    {
+        LastSummaryFrameCount = MAX_uint64;
+        OnCrossComboWindow.Broadcast(true);
+    }
+}
+
+void UScizorComboComponent::HandleComboWindowEnd(FName NotifyName, const FBranchingPointNotifyPayload& Payload)
+{
+    if (IsComboWindow(Payload))
+    {
+        LastSummaryFrameCount = MAX_uint64;
+        OnCrossComboWindow.Broadcast(false);
     }
 }

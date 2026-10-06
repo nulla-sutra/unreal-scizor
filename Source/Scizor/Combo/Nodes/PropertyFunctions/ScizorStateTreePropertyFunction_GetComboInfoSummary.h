@@ -16,7 +16,7 @@ struct SCIZOR_API FScizorStateTreePropertyFunction_GetComboInfoSummary_InstanceD
 {
     GENERATED_BODY()
 
-    UPROPERTY(EditAnywhere, Category = Parameter)
+    UPROPERTY(EditAnywhere, Category = Input)
     TObjectPtr<UScizorComboComponent> ComboComponent;
 
     UPROPERTY(EditAnywhere, Category = Output)

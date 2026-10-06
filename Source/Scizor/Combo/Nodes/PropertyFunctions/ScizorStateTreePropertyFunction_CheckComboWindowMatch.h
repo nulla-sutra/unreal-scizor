@@ -13,7 +13,7 @@ struct SCIZOR_API FScizorStateTreePropertyFunction_CheckComboWindowMatch_Instanc
 {
     GENERATED_BODY()
 
-    UPROPERTY(EditAnywhere, Category = Context)
+    UPROPERTY(EditAnywhere, Category = Input)
     TObjectPtr<UScizorComboComponent> StateTreeComponent;
 
     UPROPERTY(EditAnywhere, Category = Parameter,

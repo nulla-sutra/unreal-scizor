@@ -23,8 +23,7 @@ public class Scizor : ModuleRules
         PrivateDependencyModuleNames.AddRange(
             new[]
             {
-                "GameplayAbilities",
-                "Gengar"
+                "GameplayAbilities"
             }
         );
     }

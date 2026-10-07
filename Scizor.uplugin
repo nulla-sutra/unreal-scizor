@@ -22,11 +22,6 @@
   ],
   "Plugins": [
     {
-      "Name": "Gengar",
-      "Enabled": true,
-      "Optional": false
-    },
-    {
       "Name": "StateTree",
       "Enabled": true,
       "Optional": false

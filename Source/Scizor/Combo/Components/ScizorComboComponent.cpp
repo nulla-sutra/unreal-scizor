@@ -2,14 +2,50 @@
 
 #include "ScizorComboComponent.h"
 
+#include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StateTreeComponent.h"
 #include "CoreGlobals.h"
-#include "Gengar/Helpers/GengarAbilityLibrary.h"
+#include "GameFramework/Controller.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerState.h"
 #include "Scizor/Combo/Animation/AnimNotifyState_ScizorComboWindow.h"
+
+namespace
+{
+    UAbilitySystemComponent* ResolveAbilitySystemComponent(AActor* Actor)
+    {
+        if (!IsValid(Actor))
+        {
+            return nullptr;
+        }
+
+        if (auto* Asc = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Actor))
+        {
+            return Asc;
+        }
+
+        // The ASC may live on PlayerState while its avatar owns this component.
+        if (const auto* Pawn = Cast<APawn>(Actor))
+        {
+            return UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Pawn->GetPlayerState());
+        }
+
+        if (const auto* Controller = Cast<AController>(Actor))
+        {
+            if (auto* Asc = ResolveAbilitySystemComponent(Controller->GetPawn()))
+            {
+                return Asc;
+            }
+            return UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Controller->PlayerState);
+        }
+
+        return nullptr;
+    }
+}
 
 UE_DEFINE_GAMEPLAY_TAG(Tag_StateTreeEvent_BachComboInput, SCIZOR_INPUT_TAG_LITERAL);
 namespace Scizor
@@ -62,7 +98,7 @@ UStateTreeComponent* UScizorComboComponent::GetStateTreeComponent() const
 
 void UScizorComboComponent::RefreshAnimationBindings()
 {
-    const auto* Asc = UGengarAbilityLibrary::ResolveAbilitySystemComponent(GetOwner());
+    const auto* Asc = ResolveAbilitySystemComponent(GetOwner());
     auto* Mesh = Asc && Asc->AbilityActorInfo.IsValid()
         ? Asc->AbilityActorInfo->SkeletalMeshComponent.Get() : nullptr;
     if (Mesh != BoundMesh.Get())

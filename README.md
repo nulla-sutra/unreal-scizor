@@ -6,14 +6,14 @@ Scizor provides combo-window queries and input routing for Unreal Engine StateTr
 
 1. Add `ScizorComboComponent` and a stock `StateTreeComponent` to the actor.
 2. Use the official **StateTree Component** schema for the tree.
-3. Add **Ability System (Gengar)** and **Combo Component (Scizor)** as global evaluators. Bind each evaluator's `Actor` input to the schema's `Actor` context.
-4. Bind Ability tasks' ASC inputs to the GAS evaluator's `AbilitySystemComponent` output. Bind combo conditions/property functions to the combo evaluator's `ComboComponent` output.
+3. Add **Combo Component (Scizor)** as a global evaluator. Bind its `Actor` input to the schema's `Actor` context.
+4. Bind combo conditions/property functions to the combo evaluator's `ComboComponent` output.
 5. Set the combo component's `StateTreeComponentReference` to the desired StateTree component. An actor with exactly one StateTree can use the automatic lookup.
 6. Initialize GAS ActorInfo before calling the official component's `StartLogic`. Send input through `SendComboInputEvent`.
 
-The GAS evaluator exposes `bReady`, ASC, AbilityOwner, Avatar, Pawn, MeshComponent, Controller, and PlayerController. Mesh and Controller are optional. It resolves ASC through GAS, including a Pawn's PlayerState, and refreshes on StateTree updates. It does not replicate another copy of GAS context.
+Scizor resolves ASC through Unreal's GameplayAbilities API, including Pawn/Controller PlayerState fallback, and reads the avatar mesh from initialized GAS ActorInfo. For StateTrees that also run GAS tasks, bind their inputs through a GAS provider chosen by the project. Gengar's **Ability System** global evaluator is an optional provider.
 
-The evaluators provide data. Gameplay Abilities remain responsible for ability execution and their network policies. Sending a StateTree event queues a local event; it is not an RPC.
+The combo evaluator provides data. Gameplay Abilities remain responsible for ability execution and their network policies. Sending a StateTree event queues a local event; it is not an RPC.
 
 ## Combo windows
 
@@ -23,7 +23,6 @@ The evaluators provide data. Gameplay Abilities remain responsible for ability e
 
 ## Dependencies
 
-- Gengar
 - StateTree
 - GameplayStateTree
 - GameplayAbilities
@@ -31,7 +30,7 @@ The evaluators provide data. Gameplay Abilities remain responsible for ability e
 
 ## Migrating Treecko assets
 
-Use the official StateTree Component schema and rebind legacy ASC/Avatar/Mesh/Controller inputs to the GAS evaluator's outputs. Rebind combo inputs to the combo evaluator. Replace unbound Treecko delay tasks with delayed OnTick transitions.
+Use the official StateTree Component schema and rebind legacy ASC/Avatar/Mesh/Controller inputs to the project's GAS provider. Rebind combo inputs to the combo evaluator. Replace unbound Treecko delay tasks with delayed OnTick transitions.
 
 Move each actor's old `StateTreeRef` and parameters to its new stock component. In combo-input abilities, route inherited StateTree/Brain calls through `ScizorComboComponent.GetStateTreeComponent()`. Keep combo-window queries on the combo component.
 

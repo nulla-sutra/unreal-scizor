@@ -3,7 +3,7 @@
   "Version": 1,
   "VersionName": "1.0",
   "FriendlyName": "Scizor",
-  "Description": "Combo windows and input routing for stock StateTree components and GAS.",
+  "Description": "A StateTree component with montage combo windows and GAS input events.",
   "Category": "Other",
   "CreatedBy": "tarnishablec",
   "CreatedByURL": "https://github.com/tarnishablec",

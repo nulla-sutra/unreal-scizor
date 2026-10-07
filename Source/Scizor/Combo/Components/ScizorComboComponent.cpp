@@ -7,7 +7,6 @@
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "Components/SkeletalMeshComponent.h"
-#include "Components/StateTreeComponent.h"
 #include "CoreGlobals.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/Pawn.h"
@@ -53,47 +52,28 @@ namespace Scizor
     const FGameplayTag DefaultComboEventTag = Tag_StateTreeEvent_BachComboInput;
 }
 
-UScizorComboComponent::UScizorComboComponent()
+UScizorComboComponent::UScizorComboComponent(const FObjectInitializer& ObjectInitializer)
+    : Super(ObjectInitializer)
 {
-    PrimaryComponentTick.bCanEverTick = false;
     ComboWindowClass = UAnimNotifyState_ScizorComboWindow::StaticClass();
 }
 
 void UScizorComboComponent::BeginPlay()
 {
-    Super::BeginPlay();
+    // Bind montage notifications before the inherited component can start its tree.
     RefreshAnimationBindings();
+    Super::BeginPlay();
 }
 
 void UScizorComboComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+    Super::EndPlay(EndPlayReason);
     UnbindAnimation();
     if (auto* Mesh = BoundMesh.Get())
     {
         Mesh->OnAnimInitialized.RemoveDynamic(this, &ThisClass::HandleMeshAnimInitialized);
     }
     BoundMesh.Reset();
-    Super::EndPlay(EndPlayReason);
-}
-
-UStateTreeComponent* UScizorComboComponent::GetStateTreeComponent() const
-{
-    if (!GetOwner())
-    {
-        return nullptr;
-    }
-    if (!StateTreeComponentReference.ComponentProperty.IsNone()
-        || !StateTreeComponentReference.PathToComponent.IsEmpty()
-        || StateTreeComponentReference.OtherActor.IsValid()
-        || StateTreeComponentReference.OverrideComponent.IsValid())
-    {
-        return Cast<UStateTreeComponent>(StateTreeComponentReference.GetComponent(GetOwner()));
-    }
-
-    // The implicit choice is safe only when the actor has exactly one StateTree.
-    TInlineComponentArray<UStateTreeComponent*> Components;
-    GetOwner()->GetComponents(Components);
-    return Components.Num() == 1 ? Components[0] : nullptr;
 }
 
 void UScizorComboComponent::RefreshAnimationBindings()
@@ -209,19 +189,13 @@ void UScizorComboComponent::SendComboInputEvent(const FGameplayTag Tag,
     const TInstancedStruct<FScizorComboInputEventPayload>& Payload)
 {
     RefreshAnimationBindings();
-    auto* Tree = GetStateTreeComponent();
-    if (!Tree)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("Scizor: assign a StateTree component on %s."), *GetNameSafe(GetOwner()));
-        return;
-    }
     if (Payload.IsValid())
     {
-        Tree->SendStateTreeEvent(Tag, FConstStructView::Make(Payload.Get()), GetFName());
+        SendStateTreeEvent(Tag, FConstStructView::Make(Payload.Get()), GetFName());
     }
     else
     {
-        Tree->SendStateTreeEvent(Tag, FConstStructView(), GetFName());
+        SendStateTreeEvent(Tag, FConstStructView(), GetFName());
     }
 }
 

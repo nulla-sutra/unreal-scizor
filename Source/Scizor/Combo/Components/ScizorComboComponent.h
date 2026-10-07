@@ -3,8 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Components/ActorComponent.h"
-#include "Engine/EngineTypes.h"
+#include "Components/StateTreeComponent.h"
 #include "NativeGameplayTags.h"
 #include "Scizor/Combo/ComboTypes.h"
 #include "StructUtils/InstancedStruct.h"
@@ -16,7 +15,6 @@ UE_DECLARE_GAMEPLAY_TAG_EXTERN(Tag_StateTreeEvent_BachComboInput);
 class UAnimInstance;
 class UAnimNotify_PlayMontageNotifyWindow;
 class USkeletalMeshComponent;
-class UStateTreeComponent;
 struct FBranchingPointNotifyPayload;
 
 namespace Scizor
@@ -26,27 +24,20 @@ namespace Scizor
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FScizorCrossComboWindowDelegate, bool, bWindowOpen);
 
-/** Combo data and input routing; execution belongs to a separate stock StateTree component. */
+/** The official StateTree component with montage combo-window queries and typed input events. */
 UCLASS(ClassGroup=(Scizor), meta=(BlueprintSpawnableComponent))
-class SCIZOR_API UScizorComboComponent : public UActorComponent
+class SCIZOR_API UScizorComboComponent : public UStateTreeComponent
 {
     GENERATED_BODY()
 
 public:
-    UScizorComboComponent();
-
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combo",
-        meta=(UseComponentPicker, AllowedClasses="/Script/GameplayStateTreeModule.StateTreeComponent"))
-    FComponentReference StateTreeComponentReference;
+    UScizorComboComponent(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Combo")
     TSubclassOf<UAnimNotify_PlayMontageNotifyWindow> ComboWindowClass;
 
     UPROPERTY(BlueprintAssignable, Category="Combo")
     FScizorCrossComboWindowDelegate OnCrossComboWindow;
-
-    UFUNCTION(BlueprintPure, Category="Combo")
-    UStateTreeComponent* GetStateTreeComponent() const;
 
     UFUNCTION(BlueprintPure, Category="Combo")
     FScizorComboInfoSummary GetComboInfoSummary();

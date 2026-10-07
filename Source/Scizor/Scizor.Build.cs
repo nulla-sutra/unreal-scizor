@@ -13,6 +13,7 @@ public class Scizor : ModuleRules
                 "Core",
                 "CoreUObject",
                 "Engine",
+                "AIModule",
                 "AnimGraphRuntime",
                 "EnhancedInput",
                 "GameplayTags",

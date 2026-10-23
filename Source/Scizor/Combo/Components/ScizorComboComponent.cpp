@@ -1,6 +1,6 @@
 ﻿// Copyright 2019-Present tarnishablec. All Rights Reserved.
 
-#include "ScizorComboComponent.h"
+#include "Scizor/Combo/Components/ScizorComboComponent.h"
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"

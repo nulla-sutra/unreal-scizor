@@ -1,6 +1,6 @@
 // Copyright 2019-Present tarnishablec. All Rights Reserved.
 
-#include "ScizorStateTreeEvaluator_ComboComponent.h"
+#include "Scizor/Combo/Nodes/Evaluators/ScizorStateTreeEvaluator_ComboComponent.h"
 
 #include "GameFramework/Actor.h"
 #include "Scizor/Combo/Components/ScizorComboComponent.h"

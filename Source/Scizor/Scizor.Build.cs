@@ -6,7 +6,10 @@ public class Scizor : ModuleRules
 {
     public Scizor(ReadOnlyTargetRules Target) : base(Target)
     {
-        PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+        PCHUsage = PCHUsageMode.Default;
+
+        // Resolve module-qualified headers through Unreal's parent include paths.
+        bLegacyParentIncludePaths = true;
         PublicDependencyModuleNames.AddRange(
             new[]
             {

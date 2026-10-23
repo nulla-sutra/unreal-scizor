@@ -1,4 +1,4 @@
 ﻿// Copyright 2019-Present tarnishablec. All Rights Reserved.
 
 
-#include "ScizorComboLibrary.h"
+#include "Scizor/Combo/Helpers/ScizorComboLibrary.h"

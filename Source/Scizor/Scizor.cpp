@@ -1,6 +1,6 @@
 ﻿// Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "Scizor.h"
+#include "Scizor/Scizor.h"
 
 #define LOCTEXT_NAMESPACE "FScizorModule"
 
